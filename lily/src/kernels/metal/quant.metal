@@ -1,5 +1,6 @@
 // Affine Q4/Q8 kernels with BF16 activations and FP32 accumulation.
 // Q4 codes pack eight low-nibble-first values per u32; w = scale*q + bias.
+// Portions use MLX affine quantization and qdot constructions; see NOTICE.
 
 #include <metal_stdlib>
 using namespace metal;

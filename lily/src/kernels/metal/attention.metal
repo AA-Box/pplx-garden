@@ -831,6 +831,7 @@ sdpa_decode_split_gqa_t<4, 1, 4, 1, 0, 1>(
     device float*, constant uint&, constant uint&, constant uint&, constant uint&,
     constant uint&, constant float&, constant uint&, uint2, uint, uint, uint);
 
+// Fixed-block decode is adapted from MLX sdpa_vector_2pass_1; see NOTICE.
 #define LILY_MLX_DECL(j)                                                       \
     float4 qa##j, qb##j, aa##j, ab##j;                                        \
     float m##j, l##j;                                                         \

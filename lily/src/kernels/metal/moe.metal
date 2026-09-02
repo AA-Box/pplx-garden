@@ -1,4 +1,5 @@
 // Sparse-MoE routing, expert projection, and weighted combine.
+// Portions use MLX/MLX-LM quantized expert and routing constructions; see NOTICE.
 
 #include <metal_stdlib>
 using namespace metal;

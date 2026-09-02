@@ -30,6 +30,7 @@ provides greedy text generation through a minimal OpenAI-compatible HTTP API.
 
 * Docs: [lily/README.md](lily/README.md)
 * Blog Post: [Optimizing On-Device Inference for Apple Silicon](https://www.perplexity.ai/hub/blog/optimizing-on-device-inference-for-apple-silicon)
+* License: [Apache-2.0](lily/LICENSE), with third-party notices in [lily/NOTICE](lily/NOTICE)
 
 ## Directory Structure
 

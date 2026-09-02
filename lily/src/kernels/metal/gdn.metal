@@ -1,4 +1,5 @@
 // Gated DeltaNet recurrence, causal depthwise conv1d, and gated RMSNorm.
+// The gated delta step is adapted from MLX-LM; see NOTICE.
 #include <metal_stdlib>
 using namespace metal;
 
