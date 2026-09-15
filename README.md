@@ -4,13 +4,12 @@ pplx-garden
 Perplexity AI open source garden for inference technology
 
 > [!NOTE]
-> This AA-Box fork extends **Lily** to Apple GPU family 9 so it can run on
-> **M4, M4 Pro, and M4 Max** systems on macOS 26+. Upstream Lily intentionally
-> gates the production path to Apple GPU family 10 / M5+. The AA-Box port keeps
-> the same Rust + Metal engine and Metal 4 tensor kernels while allowing the
-> family-9 compatibility path. M5+ keeps its native GPU neural-accelerator path.
+> Lily in this repository supports **Apple Silicon M1 and newer** on
+> **macOS 26.1+**. Apple GPU families 7-9 (M1-M4) execute Metal 4 TensorOps
+> through optimized GPU shader implementations, while Apple GPU family 10+
+> (M5 and newer) can use the per-GPU-core Neural Accelerators.
 >
-> See [lily/README.md](lily/README.md#apple-m4-support) for requirements,
+> See [lily/README.md](lily/README.md#apple-silicon-support) for requirements,
 > limitations, validation commands, and performance expectations.
 
 ## Projects
@@ -38,8 +37,8 @@ Unigram tokenizer encoder
 Rust and Metal inference server for Qwen3.6-35B-A3B on Apple Silicon. Lily
 provides greedy text generation through a minimal OpenAI-compatible HTTP API.
 
-The AA-Box fork adds Apple GPU family 9 support for M4-class Macs while
-preserving the upstream M5+ path.
+This version accepts Apple GPU family 7 and later, covering M1, M2, M3, M4,
+and M5+ systems that meet the macOS and memory requirements.
 
 * Docs: [lily/README.md](lily/README.md)
 * Upstream Blog Post: [Optimizing On-Device Inference for Apple Silicon](https://www.perplexity.ai/hub/blog/optimizing-on-device-inference-for-apple-silicon)
