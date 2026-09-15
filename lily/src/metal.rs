@@ -48,10 +48,12 @@ impl Kernel {
 pub enum MslVersion {
     /// Metal 3.1 (macOS 14+): the baseline for every kernel (`bfloat`).
     V3_1,
-    /// Metal 4.0 (macOS 26+): tensor ops / MetalPerformancePrimitives.
-    /// Apple GPU family 10+ can accelerate these operations with native GPU
-    /// neural accelerators; family 9 provides the compatibility path used by
-    /// this fork for M4-class devices.
+    /// Metal 4.0 (macOS 26+): tensor ops / MetalPerformancePrimitives (the
+    /// neural-accelerator matmul path on Apple GPU family 10+). On Apple GPU
+    /// families 7-9, TensorOps use optimized shader implementations instead.
+    /// Lily's BF16 tensor kernels require macOS 26.1+. Compilation fails where
+    /// Metal 4 is unavailable, so callers that support older environments must
+    /// keep a 3.1 fallback.
     V4_0,
     /// Metal 4.1 (macOS 27+). objc2-metal 0.3.2 predates the named constant,
     /// but MTLLanguageVersion is an open integer wrapper and the SDK value is
@@ -74,9 +76,9 @@ impl MslVersion {
 /// than a silent heap fallback, so the bound stays honest.
 const MAX_KERNEL_PARAMS: usize = 16;
 
-/// AA-Box compatibility floor. Apple GPU family 9 covers M3/M4; this fork is
-/// specifically targeted and documented for M4-class Macs.
-const MIN_APPLE_GPU_FAMILY: i64 = 9;
+/// Minimum Apple GPU family with Metal 4 support on Apple Silicon.
+/// Family 7 corresponds to M1-class GPUs.
+const MIN_APPLE_GPU_FAMILY: i64 = 7;
 
 pub struct MetalContext {
     device: Retained<ProtocolObject<dyn MTLDevice>>,
@@ -93,17 +95,15 @@ impl MetalContext {
             .newCommandQueue()
             .ok_or_else(|| anyhow!("failed to create command queue"))?;
         let ctx = Self { device, queue, pipelines: Mutex::new(HashMap::new()) };
-        // Upstream intentionally restricts production to family 10 / M5 so
-        // tensor-heavy work uses native GPU neural accelerators. The AA-Box
-        // compatibility path also accepts family 9 / M4 and lets the existing
-        // Metal 4 pipeline compilation determine whether the required tensor
-        // operations are available on the installed macOS version.
+        // Metal 4 TensorOps are portable across Apple Silicon. Family 10+ can
+        // execute them on native GPU Neural Accelerators; families 7-9 use
+        // optimized shader implementations. Runtime pipeline compilation is
+        // still the final capability check for the installed macOS version.
         let family = ctx.apple_gpu_family();
         ensure!(
             family >= MIN_APPLE_GPU_FAMILY,
             "lily needs Apple GPU family {MIN_APPLE_GPU_FAMILY} or later \
-             (M3/M4-class or newer; M4 is the AA-Box target); this device reports \
-             family {family}"
+             (M1-class or newer); this device reports family {family}"
         );
         Ok(ctx)
     }
@@ -112,9 +112,9 @@ impl MetalContext {
         &self.device
     }
 
-    /// True when Metal reports Apple GPU family 10 or newer, where tensor
-    /// operations can use the per-GPU-core Neural Accelerators introduced with
-    /// M5. Family 9 remains supported by this fork but returns false here.
+    /// True when Metal reports Apple GPU family 10 or newer, where TensorOps
+    /// can use the per-GPU-core Neural Accelerators introduced with M5.
+    /// Families 7-9 remain supported but return false here.
     pub fn has_native_tensor_acceleration(&self) -> bool {
         self.apple_gpu_family() >= 10
     }
@@ -245,10 +245,10 @@ impl MetalContext {
         })
     }
 
-    /// Highest supported Apple GPU family number known to this build (10 for
-    /// M5-class with native neural accelerators, 9 for M3/M4-class). Metal
-    /// exposes no direct "native tensor units" query; the family number is the
-    /// architecture-policy signal.
+    /// Highest supported Apple GPU family number known to this build:
+    /// 10=M5+, 9=M3/M4, 8=M2, 7=M1. Metal exposes no direct query for whether
+    /// TensorOps are using native Neural Accelerators, so the family number is
+    /// the architecture-policy signal.
     pub fn apple_gpu_family(&self) -> i64 {
         (1..=10i64)
             .rev()
