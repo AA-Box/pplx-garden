@@ -4,9 +4,8 @@ A small Metal inference server for one checkpoint: Qwen3.6-35B-A3B converted
 to MLX affine 4-bit weights. Lily exposes a minimal subset of the OpenAI chat
 completions API and always decodes greedily.
 
-This AA-Box fork adds Apple GPU family 9 compatibility for M4-class Macs while
-retaining the upstream M5+ implementation. The inference engine remains Rust +
-Metal; this port does not route inference through MLX.
+This version supports Apple Silicon from M1 onward while retaining the same
+Rust + Metal inference engine. It does not route inference through MLX.
 
 Performance reports from upstream include the measurement contract and
 reproduction steps:
@@ -14,54 +13,54 @@ reproduction steps:
 - [2026-09-01: MLX 0.31.2](docs/2026-09-01-performance-mlx-0.31.2.md)
 - [2026-09-02: MLX 0.32.2](docs/2026-09-02-performance-mlx-0.32.2.md)
 
-Those reports were measured on M5 Max and should not be treated as M4
-performance numbers.
+Those reports were measured on M5 Max and should not be treated as performance
+numbers for earlier Apple Silicon generations.
 
 The Metal kernels compile from source at runtime; there is no offline shader
 build step.
 
 ## Requirements
 
-- Apple GPU family 9 or later
-  - M4 / M4 Pro / M4 Max: supported by the AA-Box compatibility path
-  - M5 and newer: supported with the upstream native tensor-accelerated path
-  - M3 is also Apple GPU family 9 and is accepted by the capability check, but
-    this fork is specifically targeting and documenting M4
-- macOS 26 or later for Metal 4 tensor operations
+- Apple GPU family 7 or later:
+  - M1: Apple GPU family 7
+  - M2: Apple GPU family 8
+  - M3 / M4: Apple GPU family 9
+  - M5 and newer: Apple GPU family 10+ with native GPU Neural Accelerators
+- macOS 26.1 or later. Lily's production TensorOps use BF16 tensors, whose
+  Metal 4 tensor support was added in macOS 26.1.
 - Rust 1.92, pinned by `rust-toolchain.toml`
 - A local Qwen3.6-35B-A3B MLX affine 4-bit checkpoint with group size 64
+- Enough unified memory for the 35B checkpoint, runtime buffers, and KV cache.
+  Hardware compatibility does not imply that every base-memory M1/M2/M3/M4
+  configuration can fit this model.
 
-## Apple M4 support
+## Apple Silicon support
 
-Upstream Lily deliberately rejects devices below Apple GPU family 10 even
-though its device code already identifies family 9 as the M3/M4 generation.
-The AA-Box port changes the minimum accepted family to 9.
+Upstream Lily deliberately restricts startup to Apple GPU family 10 / M5 and
+newer. Metal 4 TensorOps themselves are portable across Apple Silicon. Apple
+documents M1 as family 7, M2 as family 8, M3/M4 as family 9, and M5 as family
+10. This version therefore accepts Apple GPU family 7 and later.
 
 Lily's production prefill path uses Metal 4 tensors and Metal Performance
-Primitives for BF16 GEMM, grouped Q4 GEMM, and prefill attention. On M5 /
-Apple10, these operations can use the Neural Accelerator present in each GPU
-core. On M4 / Apple9, the same Metal 4 programming model is used without the
-M5 hardware Neural Accelerators.
+Primitives for BF16 GEMM, grouped Q4 GEMM, and prefill attention. On M5 and
+newer, TensorOps can use the Neural Accelerator present in each GPU core. On
+M1 through M4, the same TensorOps programming model runs through optimized GPU
+shader implementations instead of the M5 Neural Accelerators.
 
-This means M4 support is a compatibility port, not an attempt to claim M5
-performance on M4. Tensor-heavy prefill is expected to be slower than M5;
-decode remains much more sensitive to memory bandwidth and the existing
+This is a compatibility extension, not a claim that older Apple Silicon will
+match M5 performance. Tensor-heavy prefill can be substantially slower on
+M1-M4. Decode is more strongly influenced by memory bandwidth and Lily's
 non-tensor kernels.
 
-The port intentionally does **not**:
+The compatibility changes intentionally do **not**:
 
 - convert Lily to MLX-LM;
 - change the Qwen checkpoint format;
 - add a CPU fallback;
-- pretend that M4 has M5 Neural Accelerators;
+- claim that M1-M4 have M5 Neural Accelerators;
 - alter the OpenAI-compatible HTTP API.
 
-Apple's public Metal feature tables identify M3 and M4 as Apple GPU family 9
-and M5 as family 10. Metal 4 itself is available on these Apple Silicon
-systems; family 10 adds the GPU Neural Accelerator hardware used to accelerate
-tensor operations.
-
-### Validate on an M4 Mac
+### Validate on an Apple Silicon Mac
 
 From the `lily` directory:
 
@@ -70,10 +69,10 @@ cargo build --release --locked
 cargo test --locked
 ```
 
-The shader test compiles every shipped Metal source at MSL 3.1 and then at
-MSL 4.0. With the family-9 gate enabled, an M4 reaches the production Metal 4
-shader compilation instead of failing immediately during `MetalContext`
-creation.
+The shader test reports the detected Apple GPU family, compiles every shipped
+Metal source at MSL 3.1 where applicable, and builds every production MSL 4.0
+pipeline. On M1-M4 this verifies that the optimized-shader TensorOps path can be
+created instead of failing at the former family-10 startup gate.
 
 For an end-to-end model test:
 
@@ -82,10 +81,10 @@ LILY_MODEL_DIR_35B=/path/to/Qwen3.6-35B-A3B-4bit \
   cargo test --test test_e2e_35b -- --ignored --test-threads=1
 ```
 
-For performance measurements, use `lily-bench` and report the exact M4 SKU,
-GPU core count, unified-memory size, macOS version, model revision, prompt
-length, and decode length. Do not compare an M4 result directly with the
-upstream M5 Max benchmark without accounting for the hardware difference.
+For performance measurements, use `lily-bench` and report the exact Apple
+Silicon SKU, GPU core count, unified-memory size, macOS version, model revision,
+prompt length, and decode length. Do not compare an M1-M4 result directly with
+the upstream M5 Max benchmark without accounting for the hardware difference.
 
 Lily validates the exact 35B-A3B architecture and quantization layout at load
 time. Dense Qwen checkpoints, smaller Qwen checkpoints, BF16 checkpoints,
@@ -183,9 +182,9 @@ benchmarks/         Lily/MLX harnesses and the fail-closed matrix runner
 
 ## Upstream
 
-This fork is based on [perplexityai/pplx-garden](https://github.com/perplexityai/pplx-garden).
-The M4 compatibility changes are maintained by AA-Box and are not claims about
-upstream support policy.
+This repository is based on [perplexityai/pplx-garden](https://github.com/perplexityai/pplx-garden).
+The broader Apple Silicon compatibility changes are maintained independently and
+are not claims about upstream support policy.
 
 ## License
 
