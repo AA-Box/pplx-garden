@@ -60,9 +60,9 @@ fn all_shaders_compile_and_all_kernels_build_pipelines() -> Result<()> {
     Ok(())
 }
 
-/// The `#if __METAL_VERSION__ >= 400` kernels (the neural-accelerator GEMM,
-/// flash SDPA, and blockwise GDN) only exist in the 4.0 compile; cover them
-/// at the production language version.
+/// The `#if __METAL_VERSION__ >= 400` kernels (tensor GEMM, flash SDPA, and
+/// blockwise GDN) only exist in the 4.0 compile. On an M4 this test is also the
+/// compatibility check that the production Metal 4 pipelines can be built.
 #[test]
 fn shaders_compile_at_msl4() -> Result<()> {
     let ctx = MetalContext::new()?;
