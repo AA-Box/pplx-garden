@@ -10,14 +10,14 @@ use crate::tensor::Tensor;
 
 const SOURCE: &str = include_str!("metal/gemm.metal");
 
-fn tensor_version(ctx: &MetalContext) -> Result<MslVersion> {
+fn nax_version(ctx: &MetalContext) -> Result<MslVersion> {
     static VERSION: OnceLock<Result<Option<MslVersion>, String>> = OnceLock::new();
     let resolved = VERSION.get_or_init(|| {
         let probe = |v: MslVersion| ctx.pipeline("gemm_bf16_nt_nax", SOURCE, v).is_ok();
         Ok([MslVersion::V4_0, MslVersion::V4_1].into_iter().find(|v| probe(*v)))
     });
     resolved.as_ref().map_err(|e| anyhow::anyhow!("{e}"))?.ok_or_else(|| {
-        anyhow::anyhow!("the Metal tensor GEMM compiles at no supported language version")
+        anyhow::anyhow!("the NAX GEMM compiles at no supported language version")
     })
 }
 
@@ -33,7 +33,7 @@ pub fn gemm_bf16_nt(
     ensure!(b.shape() == [n, k], "B shape {:?} != [{n}, {k}]", b.shape());
     // Output shape is arbitrary but must contain M*N contiguous elements.
     ensure!(c.numel() == m * n, "C numel {} != {m}x{n}", c.numel());
-    let pipeline = ctx.pipeline("gemm_bf16_nt_nax", SOURCE, tensor_version(ctx)?)?;
+    let pipeline = ctx.pipeline("gemm_bf16_nt_nax", SOURCE, nax_version(ctx)?)?;
     pass.dispatch_at(
         &pipeline,
         &[a.binding(), b.binding(), c.binding()],
