@@ -75,7 +75,7 @@ impl MslVersion {
 const MAX_KERNEL_PARAMS: usize = 16;
 
 /// AA-Box compatibility floor. Apple GPU family 9 covers M3/M4; this fork is
-/// specifically validated and documented for M4-class Macs.
+/// specifically targeted and documented for M4-class Macs.
 const MIN_APPLE_GPU_FAMILY: i64 = 9;
 
 pub struct MetalContext {
@@ -102,7 +102,7 @@ impl MetalContext {
         ensure!(
             family >= MIN_APPLE_GPU_FAMILY,
             "lily needs Apple GPU family {MIN_APPLE_GPU_FAMILY} or later \
-             (M4-class or newer for the AA-Box build); this device reports \
+             (M3/M4-class or newer; M4 is the AA-Box target); this device reports \
              family {family}"
         );
         Ok(ctx)
