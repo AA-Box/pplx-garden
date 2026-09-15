@@ -48,9 +48,10 @@ impl Kernel {
 pub enum MslVersion {
     /// Metal 3.1 (macOS 14+): the baseline for every kernel (`bfloat`).
     V3_1,
-    /// Metal 4.0 (macOS 26+): tensor ops / MetalPerformancePrimitives (the
-    /// neural-accelerator matmul path). Compilation fails on older systems,
-    /// so callers must keep a 3.1 fallback.
+    /// Metal 4.0 (macOS 26+): tensor ops / MetalPerformancePrimitives.
+    /// Apple GPU family 10+ can accelerate these operations with native GPU
+    /// neural accelerators; family 9 provides the compatibility path used by
+    /// this fork for M4-class devices.
     V4_0,
     /// Metal 4.1 (macOS 27+). objc2-metal 0.3.2 predates the named constant,
     /// but MTLLanguageVersion is an open integer wrapper and the SDK value is
@@ -73,6 +74,10 @@ impl MslVersion {
 /// than a silent heap fallback, so the bound stays honest.
 const MAX_KERNEL_PARAMS: usize = 16;
 
+/// AA-Box compatibility floor. Apple GPU family 9 covers M3/M4; this fork is
+/// specifically validated and documented for M4-class Macs.
+const MIN_APPLE_GPU_FAMILY: i64 = 9;
+
 pub struct MetalContext {
     device: Retained<ProtocolObject<dyn MTLDevice>>,
     queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
@@ -88,18 +93,30 @@ impl MetalContext {
             .newCommandQueue()
             .ok_or_else(|| anyhow!("failed to create command queue"))?;
         let ctx = Self { device, queue, pipelines: Mutex::new(HashMap::new()) };
-        // The production GEMM paths use native Metal tensor units.
+        // Upstream intentionally restricts production to family 10 / M5 so
+        // tensor-heavy work uses native GPU neural accelerators. The AA-Box
+        // compatibility path also accepts family 9 / M4 and lets the existing
+        // Metal 4 pipeline compilation determine whether the required tensor
+        // operations are available on the installed macOS version.
         let family = ctx.apple_gpu_family();
         ensure!(
-            family >= 10,
-            "lily needs an Apple GPU with native tensor units (family 10, M5 and \
-             later); this device reports family {family}"
+            family >= MIN_APPLE_GPU_FAMILY,
+            "lily needs Apple GPU family {MIN_APPLE_GPU_FAMILY} or later \
+             (M4-class or newer for the AA-Box build); this device reports \
+             family {family}"
         );
         Ok(ctx)
     }
 
     pub fn device(&self) -> &ProtocolObject<dyn MTLDevice> {
         &self.device
+    }
+
+    /// True when Metal reports Apple GPU family 10 or newer, where tensor
+    /// operations can use the per-GPU-core Neural Accelerators introduced with
+    /// M5. Family 9 remains supported by this fork but returns false here.
+    pub fn has_native_tensor_acceleration(&self) -> bool {
+        self.apple_gpu_family() >= 10
     }
 
     /// Compiles MSL source through the framework's compiler (the same
@@ -228,10 +245,9 @@ impl MetalContext {
         })
     }
 
-    /// Highest supported Apple GPU family number (10 for M5-class with
-    /// native neural accelerators, 9 for M3/M4-class where Metal-4 tensor
-    /// ops run via MPP emulation, 0 if none report). Metal exposes no
-    /// direct "native tensor units" query; the family number is the
+    /// Highest supported Apple GPU family number known to this build (10 for
+    /// M5-class with native neural accelerators, 9 for M3/M4-class). Metal
+    /// exposes no direct "native tensor units" query; the family number is the
     /// architecture-policy signal.
     pub fn apple_gpu_family(&self) -> i64 {
         (1..=10i64)
