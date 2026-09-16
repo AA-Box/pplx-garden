@@ -22,14 +22,14 @@ build step.
 ## Requirements
 
 - Apple GPU family 7 or later:
-  - M1: Apple GPU family 7
-  - M2: Apple GPU family 8
-  - M3 / M4: Apple GPU family 9
-  - M5 and newer: Apple GPU family 10+ with native GPU Neural Accelerators
+  - M1: Apple GPU family 7.
+  - M2: Apple GPU family 8.
+  - M3 / M4: Apple GPU family 9.
+  - M5 and newer: Apple GPU family 10+ with native GPU Neural Accelerators.
 - macOS 26.1 or later. Lily's production TensorOps use BF16 tensors, whose
   Metal 4 tensor support was added in macOS 26.1.
-- Rust 1.92, pinned by `rust-toolchain.toml`
-- A local Qwen3.6-35B-A3B MLX affine 4-bit checkpoint with group size 64
+- Rust 1.92, pinned by `rust-toolchain.toml`.
+- A local Qwen3.6-35B-A3B MLX affine 4-bit checkpoint with group size 64.
 - Enough unified memory for the 35B checkpoint, runtime buffers, and KV cache.
   Hardware compatibility does not imply that every base-memory M1/M2/M3/M4
   configuration can fit this model.
